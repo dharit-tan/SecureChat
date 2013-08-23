@@ -8,7 +8,19 @@
 #include <netdb.h>
 #include <string.h>
 
-enum {BACKLOG = 128};
+enum {BACKLOG = 128, MAX_BUF_LEN = 256};
+
+/*---------------------------------------------------------------------------------------------------*/
+
+// get sockaddr, IPv4 or IPv6:
+void *get_in_addr(struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET) {
+        return &(((struct sockaddr_in*)sa)->sin_addr);
+    }
+
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
 
 /*---------------------------------------------------------------------------------------------------*/
 
@@ -54,14 +66,16 @@ int main(int argc, char *argv[]) {
 	// socket fd shit
 	int listenerfd, newfd;
 	struct sockaddr_storage remoteaddr; // connecting client's address
-    socklen_t addrlen;
+    socklen_t addrlen;                  // length of connecting client's address
 
 	// select() shit
 	int fdmax;
 	fd_set master, read_fds;
 
 	// misc
-	int i;
+	int i, j, bytes;
+	char buf[MAX_BUF_LEN];
+    char remoteIP[INET6_ADDRSTRLEN];
 
 	// must specify port
 	if (!argv[1]) { printf("usage: reed port\n"); return 1; }
@@ -77,22 +91,49 @@ int main(int argc, char *argv[]) {
 	// main loop
     for(;;) {
         read_fds = master; // copy it
-        if (select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1) { perror("select"); exit(4); } //int select(int numfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+        if (select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1) { perror("select"); return -1; } //int select(int numfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 
         for (i = 0; i < fdmax; i++) {
-        	if FD_ISSET(i, &read_fds) {
+        	if (FD_ISSET(i, &read_fds)) {
         		if (i == listenerfd) {
-        			remoteaddr = sizeof()
+        			addrlen = sizeof(remoteaddr);
+
+        			// accept new connection
+        			newfd = accept(listenerfd, (struct sockaddr *)&remoteaddr, &addrlen);
+        			if (newfd == -1) perror("accept");
+        			else {
+        				FD_SET(newfd, &master);
+        				if (newfd > fdmax) fdmax = newfd;
+
+        				 printf("server: new connection from %s on socket %d\n",
+                            inet_ntop(remoteaddr.ss_family,
+                            get_in_addr((struct sockaddr*)&remoteaddr),
+                            remoteIP, INET6_ADDRSTRLEN),
+                            newfd);
+        			}
         		}
-        	}
-        }
+        		else {
+        			bytes = recv(i, buf, sizeof(buf), 0);
+        			if (bytes < 0) {
+	        			if (bytes == 0)      // client closed the connection
+	        				printf("selectserver: socket %d hung up\n", i);
+	        			else
+	        				perror("recv\n");
+	        			close(i);
+	        			FD_CLR(i, &master);  // remove this fd from the master set
+	        		}
+	        		else {
+	        			for (j = 0; j < fdmax; j++) {
+	        				if (j != listenerfd && j != i) {
+	        					bytes = send(j, buf, bytes, 0);
+	        					if (bytes == -1) perror("send");
+	        				}
+	        			} // END sending for loop
+	        		} // END recv else
+        		} // END listenerfd else
+        	} // END read_fds if statement
+        } // END going through all the fd's
+	} // END main for loop
 
-
-
-
-
-
-
-
-
+	return 0;
 }
