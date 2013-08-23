@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
         		}
         		else {
         			bytes = recv(i, buf, sizeof(buf), 0);
-        			if (bytes < 0) {
+        			if (bytes <= 0) {
 	        			if (bytes == 0)      // client closed the connection
 	        				printf("selectserver: socket %d hung up\n", i);
 	        			else
@@ -124,12 +124,15 @@ int main(int argc, char *argv[]) {
 	        			FD_CLR(i, &master);  // remove this fd from the master set
 	        		}
 	        		else {
-	        			for (j = 0; j < fdmax; j++) {
-	        				if (j != listenerfd && j != i) {
-	        					printf("%s\n", buf);
-	        					// bytes = send(j, buf, bytes, 0);
-	        					// if (bytes == -1) perror("send");
-	        				}
+	        			for (j = 0; j <= fdmax; j++) {
+	        				if (FD_ISSET(j, &master) && j != i) {
+	        					printf("%s", buf);
+        					    memset(&buf, 0, sizeof(buf)); /* avoid valgrind error of unitialized variables */
+		        				if (j != listenerfd && j != i) {
+		        					// bytes = send(j, buf, bytes, 0);
+		        					// if (bytes == -1) perror("send");
+		        				}
+		        			}
 	        			} // END sending for loop
 	        		} // END recv else
         		} // END listenerfd else
