@@ -124,16 +124,16 @@ int main(int argc, char *argv[]) {
 	        			FD_CLR(i, &master);  // remove this fd from the master set
 	        		}
 	        		else {
+    					printf("%s", buf);
 	        			for (j = 0; j <= fdmax; j++) {
-	        				if (FD_ISSET(j, &master) && j != i) {
-	        					printf("%s", buf);
-        					    memset(&buf, 0, sizeof(buf)); /* avoid valgrind error of unitialized variables */
+	        				if (FD_ISSET(j, &master)) {
 		        				if (j != listenerfd && j != i) {
-		        					// bytes = send(j, buf, bytes, 0);
-		        					// if (bytes == -1) perror("send");
+		        					bytes = send(j, buf, bytes, 0);
+		        					if (bytes == -1) perror("send");
 		        				}
 		        			}
-	        			} // END sending for loop
+	        			}
+					    memset(&buf, 0, sizeof(buf)); /* avoid valgrind error of unitialized variables */
 	        		} // END recv else
         		} // END listenerfd else
         	} // END read_fds if statement
