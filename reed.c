@@ -8,14 +8,18 @@
 #include <netdb.h>
 #include <string.h>
 
+enum {BACKLOG = 128};
+
+/*---------------------------------------------------------------------------------------------------*/
+
 int createSocket(char *host, char *port) {
 	int ret, yes, socketfd;
 	struct addrinfo hints, *servinfo, *p;
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;     // don't care if IPv4 or IPv6
-	hints.ai_socktype = SOCK_STREAM; // TCP
-	hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
+	hints.ai_family = AF_UNSPEC;             // don't care if IPv4 or IPv6
+	hints.ai_socktype = SOCK_STREAM;         // TCP
+	if (!host) hints.ai_flags = AI_PASSIVE;  // fill in my IP for me if host is not supplied
 
 	ret = getaddrinfo(host, port, &hints, &servinfo);
 	if (ret != 0) free(servinfo); return -1;
@@ -44,6 +48,51 @@ int createSocket(char *host, char *port) {
 	return socketfd;
 }
 
-int main(argc, char *argv[]) {
-	
+/*---------------------------------------------------------------------------------------------------*/
+
+int main(int argc, char *argv[]) {
+	// socket fd shit
+	int listenerfd, newfd;
+	struct sockaddr_storage remoteaddr; // connecting client's address
+    socklen_t addrlen;
+
+	// select() shit
+	int fdmax;
+	fd_set master, read_fds;
+
+	// misc
+	int i;
+
+	// must specify port
+	if (!argv[1]) { printf("usage: reed port\n"); return 1; }
+
+	listenerfd = createSocket(NULL, argv[1]); // create socket
+
+	// listen
+	if (listen(listenerfd, 10) == -1) { perror("listen"); exit(3); }
+
+    FD_SET(listenerfd, &master); // add the listener to the master set
+    fdmax = listenerfd; // keep track of the max fd, right now it's listenerfd
+
+	// main loop
+    for(;;) {
+        read_fds = master; // copy it
+        if (select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1) { perror("select"); exit(4); } //int select(int numfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+
+        for (i = 0; i < fdmax; i++) {
+        	if FD_ISSET(i, &read_fds) {
+        		if (i == listenerfd) {
+        			remoteaddr = sizeof()
+        		}
+        	}
+        }
+
+
+
+
+
+
+
+
+
 }
