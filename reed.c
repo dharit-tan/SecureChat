@@ -34,11 +34,10 @@ int createSocket(char *host, char *port) {
 	if (!host) hints.ai_flags = AI_PASSIVE;  // fill in my IP for me if host is not supplied
 
 	ret = getaddrinfo(host, port, &hints, &servinfo);
-	if (ret != 0) free(servinfo); return -1;
+	if (ret != 0) { free(servinfo); return -1; }
 
 	/* iterate through returned addrinfos and attempt to create socket, then bind or connect */
-	for (p = servinfo; p != NULL; p = p->ai_next)
-	{
+	for (p = servinfo; p != NULL; p = p->ai_next) {
 		// create socket
 		socketfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
 		if (socketfd == -1) continue;
@@ -78,12 +77,14 @@ int main(int argc, char *argv[]) {
     char remoteIP[INET6_ADDRSTRLEN];
 
 	// must specify port
-	if (!argv[1]) { printf("usage: reed port\n"); return 1; }
+	if (!argv[1]) { printf("usage: reed port\n"); return -1; }
+
+    FD_ZERO(&master);    // clear the master and temp sets
+    FD_ZERO(&read_fds);
 
 	listenerfd = createSocket(NULL, argv[1]); // create socket
-
 	// listen
-	if (listen(listenerfd, 10) == -1) { perror("listen"); exit(3); }
+	if (listen(listenerfd, 10) == -1) { perror("listen"); return -1; }
 
     FD_SET(listenerfd, &master); // add the listener to the master set
     fdmax = listenerfd; // keep track of the max fd, right now it's listenerfd
@@ -92,8 +93,8 @@ int main(int argc, char *argv[]) {
     for(;;) {
         read_fds = master; // copy it
         if (select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1) { perror("select"); return -1; } //int select(int numfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
-
-        for (i = 0; i < fdmax; i++) {
+        
+        for (i = 0; i <= fdmax; i++) {
         	if (FD_ISSET(i, &read_fds)) {
         		if (i == listenerfd) {
         			addrlen = sizeof(remoteaddr);
@@ -118,15 +119,16 @@ int main(int argc, char *argv[]) {
 	        			if (bytes == 0)      // client closed the connection
 	        				printf("selectserver: socket %d hung up\n", i);
 	        			else
-	        				perror("recv\n");
+	        				perror("recv");
 	        			close(i);
 	        			FD_CLR(i, &master);  // remove this fd from the master set
 	        		}
 	        		else {
 	        			for (j = 0; j < fdmax; j++) {
 	        				if (j != listenerfd && j != i) {
-	        					bytes = send(j, buf, bytes, 0);
-	        					if (bytes == -1) perror("send");
+	        					printf("%s\n", buf);
+	        					// bytes = send(j, buf, bytes, 0);
+	        					// if (bytes == -1) perror("send");
 	        				}
 	        			} // END sending for loop
 	        		} // END recv else
